@@ -22,4 +22,5 @@ def mock_review():
     return {
         "status": "success",
         "review": "This is a mock AI code review. The files look structurally sound."
+        "Good job! However, please ensure to follow best practices and coding standards for your specific programming language."
     }
