@@ -5,3 +5,5 @@ __pycache__/
 .vscode/*
 task.md
 documentation.md
+# Auto-created SQLite database
+ai_code_reviewer.db
