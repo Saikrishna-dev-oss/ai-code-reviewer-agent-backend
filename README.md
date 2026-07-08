@@ -1,43 +1,40 @@
-# AI Code Reviewer Agent Backend
+# 🧠 AI-Code Reviewer Agent (Backend)
 
-A lightweight Python backend designed to power an **AI-driven code review agent**.  
-This project provides the foundation for integrating AI models or APIs that analyze source code and deliver automated review feedback.
+A production-grade Python backend built with **FastAPI** to power the AI-driven code review agent. 
+
+This repository serves as the secure data layer and API gateway, handling user authentication, request validation, global error handling, and eventual AI model integration.
 
 ---
 
 ## 📑 Table of Contents
 - [About](#about)
-- [Features](#features)
+- [Core Features](#core-features)
 - [Requirements](#requirements)
-- [Installation](#installation)
-- [Usage](#usage)
+- [Installation & Setup](#installation--setup)
+- [Interactive API Docs](#interactive-api-docs)
 - [Project Structure](#project-structure)
 
-## In development:
-- [Configuration](#configuration)
-- [Contributing](#contributing)
-- [License](#license)
+---
+
+## 📖 About
+Designed with a decoupled microservice architecture, this backend provides a robust RESTful API that communicates seamlessly with the React frontend. It utilizes an embedded SQLite database and enforces strict data validation to ensure a secure, zero-friction user experience.
 
 ---
 
-## About
-The backend is built with **Python** and serves as the entrypoint for an AI code reviewer service.  
-It is intentionally minimal, making it easy to extend with your own logic, APIs, or integrations.
+## ✨ Core Features
+- ⚡ **FastAPI Framework:** High-performance, asynchronous REST API.
+- 🔐 **Secure Authentication:** Implements SHA-256 cryptographic salting and hashing for secure user credential storage.
+- 🗄️ **Embedded SQLite Database:** Zero-config database handling user profiles and system state.
+- 🛡️ **Pydantic Validation:** Strict request/response payload validation to prevent bad data from hitting the database.
+- 📜 **Custom Logging Engine:** A custom SQLite log handler that intercepts global HTTP exceptions and records chronological system events.
+- 🚦 **Global Exception Handlers:** Graceful error interception returning clean, formatted JSON (401, 404, 409, 422).
 
 ---
 
-## Features
-- 🔹 **Minimal backend scaffold** for quick setup.  
-- 🔹 **Single entrypoint (`main.py`)** to run the service.  
-- 🔹 **Dependency management** via `requirements.txt`.  
-- 🔹 **Customizable** for different AI models or APIs.  
-
----
-
-## Requirements
-- Python **3.10+**  
-- pip (Python package manager)  
-- Internet access for AI API integrations  
+## 💻 Requirements
+- Python **3.8+** (3.10+ recommended)
+- `pip` (Python package manager)
+- Embedded SQLite3 (Built into Python)
 
 ---
 
@@ -47,7 +44,6 @@ It is intentionally minimal, making it easy to extend with your own logic, APIs,
    ```bash
    git clone https://github.com/Saikrishna-dev-oss/ai-code-reviewer-agent-backend.git
    cd ai-code-reviewer-agent-backend
-
 
 2. **Create a virtual environment**
    ```bash
@@ -63,19 +59,30 @@ It is intentionally minimal, making it easy to extend with your own logic, APIs,
 
 4. **Run the backend**
    ```bash
-   python main.py
+   uvicorn main:app --reload
 
    The backend will be running at `http://localhost:8000`. You can send requests to this endpoint for code review.
    ```
 
-5. **Project Structure**
+### 📂 Project Structure
 
-    ```
-    ai-code-reviewer-agent-backend/
-    │
-    ├── main.py            # Entry point script
-    ├── requirements.txt   # Python dependencies
-    ├── .gitignore         # Ignored files for Git
-    └── README.md          # Project documentation
+```
+ai-code-reviewer-agent-backend/
+│
+├── main.py                # FastAPI app routing and global exception handlers
+├── database.py            # SQLite connection, table creation, and queries
+├── schemas.py             # Pydantic models for strict JSON validation
+├── auth_utils.py          # Cryptographic hashing and verification logic
+├── logging_config.py      # Custom SQLite logging handlers and formatting
+├── requirements.txt       # Python dependency list
+├── .gitignore             # Ignored files (including the .db file)
+└── README.md              # Project documentation
+```
+---
 
-    ```
+## LICENSE
+This Project is under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+### In development:
+- [Configuration](#configuration)
+- [Contributing](#contributing)
