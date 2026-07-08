@@ -1,7 +1,5 @@
 """SQLite helper functions for the AI Code Reviewer backend.
 
-This file is intentionally small and dependency-free so the internship project
-can satisfy database requirements without changing the existing frontend code.
 """
 
 from __future__ import annotations
