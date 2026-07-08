@@ -10,20 +10,30 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+# Define the base directory and database file path
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = BASE_DIR / "ai_code_reviewer.db"
 
 
 def get_connection() -> sqlite3.Connection:
-    """Create a SQLite connection with rows accessible like dictionaries."""
+    """
+    Create a SQLite connection with rows accessible like dictionaries.
+    - check_same_thread=False allows usage across threads.
+    - row_factory=sqlite3.Row makes query results behave like dicts.
+    """
     connection = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     return connection
 
 
 def init_db() -> None:
-    """Create the required tables if they do not already exist."""
+    """
+    Initialize the database by creating required tables if they don't exist.
+    - users table stores account info.
+    - api_logs table stores logs for API requests.
+    """
     with get_connection() as connection:
+        # Create users table
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -35,6 +45,7 @@ def init_db() -> None:
             )
             """
         )
+        # Create API logs table
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS api_logs (
@@ -53,17 +64,22 @@ def init_db() -> None:
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    """
+    Convert a SQLite Row object into a Python dictionary.
+    Returns None if the row is None.
+    """
     if row is None:
         return None
     return dict(row)
 
 
-def public_user(row: sqlite3.Row | dict[str, Any] | None) -> dict[str, Any] | None:
-    """Return user data without exposing the stored password hash."""
-    if row is None:
-        return None
+def public_user(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
+    """
+    Convert a user row into a public dictionary format.
+    Removes sensitive fields like password_hash.
+    """
     data = dict(row)
-    data.pop("password_hash", None)
+    data.pop("password_hash", None)  # Remove password hash for security
     return {
         "id": data.get("id"),
         "email": data.get("email"),
@@ -72,7 +88,15 @@ def public_user(row: sqlite3.Row | dict[str, Any] | None) -> dict[str, Any] | No
     }
 
 
-def create_user(email: str, password_hash: str, profile_image: str | None = None) -> dict[str, Any]:
+def create_user(
+    email: str,
+    password_hash: str,
+    profile_image: str | None = None
+) -> dict[str, Any] | None:
+    """
+    Insert a new user into the database.
+    Returns the created user in public format, or None if insertion fails.
+    """
     with get_connection() as connection:
         cursor = connection.execute(
             """
@@ -83,12 +107,18 @@ def create_user(email: str, password_hash: str, profile_image: str | None = None
         )
         connection.commit()
         user_id = cursor.lastrowid
+        if user_id is None:
+            return None
 
     user = get_user_by_id(int(user_id))
-    return public_user(user)  # type: ignore[return-value]
+    return public_user(user) if user else None
 
 
 def get_user_by_email(email: str) -> sqlite3.Row | None:
+    """
+    Fetch a user row by email.
+    Case-insensitive match using lower().
+    """
     with get_connection() as connection:
         return connection.execute(
             "SELECT * FROM users WHERE lower(email) = lower(?)",
@@ -97,6 +127,10 @@ def get_user_by_email(email: str) -> sqlite3.Row | None:
 
 
 def get_user_by_id(user_id: int) -> sqlite3.Row | None:
+    """
+    Fetch a user row by ID.
+    Returns None if no user is found.
+    """
     with get_connection() as connection:
         return connection.execute(
             "SELECT * FROM users WHERE id = ?",
@@ -105,6 +139,10 @@ def get_user_by_id(user_id: int) -> sqlite3.Row | None:
 
 
 def list_users() -> list[dict[str, Any]]:
+    """
+    Fetch all users ordered by creation date (latest first).
+    Returns a list of public user dictionaries.
+    """
     with get_connection() as connection:
         rows = connection.execute(
             "SELECT * FROM users ORDER BY created_at DESC"
@@ -112,7 +150,14 @@ def list_users() -> list[dict[str, Any]]:
     return [public_user(row) for row in rows if row is not None]
 
 
-def update_user_profile_image(user_id: int, profile_image: str | None) -> dict[str, Any] | None:
+def update_user_profile_image(
+    user_id: int,
+    profile_image: str | None
+) -> dict[str, Any] | None:
+    """
+    Update the profile image of a user by ID.
+    Returns the updated user in public format, or None if not found.
+    """
     with get_connection() as connection:
         connection.execute(
             "UPDATE users SET profile_image = ? WHERE id = ?",
@@ -120,7 +165,8 @@ def update_user_profile_image(user_id: int, profile_image: str | None) -> dict[s
         )
         connection.commit()
 
-    return public_user(get_user_by_id(user_id))
+    user = get_user_by_id(user_id)
+    return public_user(user) if user else None
 
 
 def insert_api_log(
@@ -131,7 +177,10 @@ def insert_api_log(
     path: str | None = None,
     status_code: int | None = None,
 ) -> None:
-    """Write one log row into SQLite. Used by the logging framework handler."""
+    """
+    Insert a new API log entry into the database.
+    Used by the logging framework handler.
+    """
     with get_connection() as connection:
         connection.execute(
             """
@@ -144,6 +193,10 @@ def insert_api_log(
 
 
 def get_api_logs(limit: int = 50) -> list[dict[str, Any]]:
+    """
+    Fetch recent API logs with a safe limit (1–200).
+    Returns a list of log dictionaries with renamed keys for frontend use.
+    """
     safe_limit = max(1, min(limit, 200))
     with get_connection() as connection:
         rows = connection.execute(

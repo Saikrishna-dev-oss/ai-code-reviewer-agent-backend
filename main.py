@@ -64,7 +64,7 @@ async def request_logging_middleware(request: Request, call_next):
     return response
 
 
-# Requirement 1: Global exception handling.
+# Global exception handling.
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     logger.warning(
@@ -128,7 +128,7 @@ def mock_review():
     }
 
 
-# ---------- Requirement 3: JSON API endpoints ----------
+# ---------- JSON API endpoints ----------
 
 def validate_email(email: str) -> str:
     cleaned_email = email.strip().lower()
@@ -190,14 +190,17 @@ def login(payload: LoginRequest):
     """Login using JSON request data."""
     return login_user_logic(payload)
 
-
 @app.get("/api/user/{user_id}")
 def get_user(user_id: int):
     """Return one user as JSON without exposing password data."""
-    user = public_user(get_user_by_id(user_id))
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-    return {"status": "success", "user": user}
+    row = get_user_by_id(user_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+    return {"status": "success", "user": public_user(row)}
+
 
 
 @app.patch("/api/user/{user_id}")
@@ -270,3 +273,5 @@ def legacy_create_user(payload: RegisterRequest):
 def legacy_update_user(user_id: int, payload: UserUpdateRequest):
     result = update_user(user_id, payload)
     return result["user"]
+
+
