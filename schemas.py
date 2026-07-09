@@ -47,3 +47,6 @@ class LogCreateRequest(BaseModel):
     """
     level: str = Field(default="INFO", max_length=20)
     message: str = Field(..., min_length=1, max_length=500)
+
+class GitHubIngestRequest(BaseModel):
+    repoUrl: str = Field(..., min_length=5, max_length=200)
