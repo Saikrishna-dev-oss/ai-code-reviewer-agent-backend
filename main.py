@@ -1,16 +1,19 @@
-
 from __future__ import annotations
 
 import logging
+import os
 from sqlite3 import IntegrityError
 from time import perf_counter
+from typing import List, Any, cast
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from openai import OpenAI
 
-# Import helper modules
+
 from auth_utils import hash_password, verify_password
 from database import (
     create_user,
@@ -26,6 +29,28 @@ from logging_config import configure_logging
 
 from schemas import LoginRequest, LogCreateRequest, RegisterRequest, UserUpdateRequest, GitHubIngestRequest
 from connect import get_github_repo_tree, GITHUB_TOKEN
+
+
+# ------------------- AI Setup -------------------
+# Configured based on the DigitalOcean architecture
+AGENT_ENDPOINT = os.getenv("AGENT_ENDPOINT", "http://localhost:8000") + "/api/v1/"
+AGENT_ACCESS_KEY = os.getenv("AGENT_ACCESS_KEY", "dummy_key_")
+
+client = OpenAI(
+    base_url=AGENT_ENDPOINT,
+    api_key=AGENT_ACCESS_KEY,
+)
+
+# ------------------- Local Schemas -------------------
+# will move these to schemas.py later to keep things perfectly clean!
+class FileItem(BaseModel):
+    fileName: str
+    content: str
+    category: str
+    loc: int
+
+class CodebaseReviewRequest(BaseModel):
+    files: List[FileItem]
 
 
 # ------------------- FastAPI Setup -------------------
@@ -133,14 +158,51 @@ def read_root():
     return {"message": "Hello World. The AI Backend is running."}
 
 
-@app.post("/review")
-def mock_review():
-    """Mock endpoint simulating an AI code review response."""
-    return {
-        "status": "success",
-        "review": "This is a mock AI code review. The files look structurally sound.",
-        "message": "Good to go!"
-    }
+# ------------------- AI Review Endpoint -------------------
+
+@app.post("/api/review")
+def generate_architecture_review(req: CodebaseReviewRequest):
+    """Analyzes the repository architecture and returns an AI-generated review."""
+    logger.info(f"Starting AI review for {len(req.files)} files", extra={"method": "POST", "path": "/api/review", "status_code": 200})
+    
+    try:
+        # Build a string representing the high-level repository structure
+        repo_structure = ""
+        for f in req.files:
+            repo_structure += f"- {f.fileName} ({f.category}, {f.loc} LOC)\n"
+
+        # Construct the Prompt for the AI
+        messages = [
+            {
+                "role": "system",
+                "content": "You are an expert AI Software Architect. Review the provided repository structure and analyze its design, scalability, and potential security flaws."
+            },
+            {
+                "role": "user",
+                "content": f"Please review this codebase architecture:\n\n{repo_structure}\n\nProvide a high-level summary, identify any missing standard files (like .gitignore or README), and suggest architectural improvements."
+            }
+        ]
+
+        # Call the Coordinator's DigitalOcean Endpoint
+        response = client.chat.completions.create(
+            model="n/a",
+            messages=cast(Any, messages),
+            extra_body={"include_retrieval_info": True}
+        )
+
+        return {
+            "status": "success",
+            "review": response.choices[0].message.content
+        }
+
+    except Exception as e:
+        logger.warning(f"AI API Call Failed. Using Mock Data. Error: {str(e)}")
+        # Safe fallback while waiting for real keys
+        mock_review = f"**[REVIEW]**\n\nI received your repository containing **{len(req.files)} files**.\n\n### Architectural Summary\n* **Structure:** The codebase looks well-categorized based on the provided file tree.\n* **Next Steps:** Once the real API keys are injected, I will provide a deep-dive analysis of the system design and flag specific architectural improvements."
+        return {
+            "status": "mock",
+            "review": mock_review
+        }
 
 
 # ------------------- Helper Functions -------------------
