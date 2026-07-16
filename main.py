@@ -1,5 +1,6 @@
 from __future__ import annotations
-
+import time
+from fastapi.responses import StreamingResponse
 import logging
 import os
 from sqlite3 import IntegrityError
@@ -162,47 +163,54 @@ def read_root():
 
 @app.post("/api/review")
 def generate_architecture_review(req: CodebaseReviewRequest):
-    """Analyzes the repository architecture and returns an AI-generated review."""
-    logger.info(f"Starting AI review for {len(req.files)} files", extra={"method": "POST", "path": "/api/review", "status_code": 200})
+    """Analyzes the repository and streams the AI-generated review."""
+    logger.info(f"Starting AI stream for {len(req.files)} files", extra={"method": "POST", "path": "/api/review", "status_code": 200})
     
-    try:
-        # Build a string representing the high-level repository structure
-        repo_structure = ""
-        for f in req.files:
-            repo_structure += f"- {f.fileName} ({f.category}, {f.loc} LOC)\n"
+    # 1. Build the repo structure string
+    repo_structure = ""
+    for f in req.files:
+        repo_structure += f"- {f.fileName} ({f.category}, {f.loc} LOC)\n"
 
-        # Construct the Prompt for the AI
-        messages = [
-            {
-                "role": "system",
-                "content": "You are an expert AI Software Architect. Review the provided repository structure and analyze its design, scalability, and potential security flaws."
-            },
-            {
-                "role": "user",
-                "content": f"Please review this codebase architecture:\n\n{repo_structure}\n\nProvide a high-level summary, identify any missing standard files (like .gitignore or README), and suggest architectural improvements."
-            }
-        ]
-
-        # Call the Coordinator's DigitalOcean Endpoint
-        response = client.chat.completions.create(
-            model="n/a",
-            messages=cast(Any, messages),
-            extra_body={"include_retrieval_info": True}
-        )
-
-        return {
-            "status": "success",
-            "review": response.choices[0].message.content
+    messages = [
+        {
+            "role": "system",
+            "content": "You are an expert AI Software Architect. Review the provided repository structure and analyze its design, scalability, and potential security flaws."
+        },
+        {
+            "role": "user",
+            "content": f"Please review this codebase architecture:\n\n{repo_structure}\n\nProvide a high-level summary, identify any missing standard files (like .gitignore or README), and suggest architectural improvements."
         }
+    ]
 
-    except Exception as e:
-        logger.warning(f"AI API Call Failed. Using Mock Data. Error: {str(e)}")
-        # Safe fallback while waiting for real keys
-        mock_review = f"**[REVIEW]**\n\nI received your repository containing **{len(req.files)} files**.\n\n### Architectural Summary\n* **Structure:** The codebase looks well-categorized based on the provided file tree.\n* **Next Steps:** Once the real API keys are injected, I will provide a deep-dive analysis of the system design and flag specific architectural improvements."
-        return {
-            "status": "mock",
-            "review": mock_review
-        }
+    # 2. Define the Generator Function
+    def stream_generator():
+        try:
+            # Tell the OpenAI client to stream the response
+            response = client.chat.completions.create(
+                model="n/a",
+                messages=cast(Any, messages), # 🚀 Re-applied the fix here
+                extra_body={"include_retrieval_info": True},
+                stream=True 
+            )
+            
+            # Yield chunks as they arrive from the AI
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
+
+        except Exception as e:
+            logger.warning(f"AI Stream Failed: {str(e)}. Using Mock Stream.")
+            
+            # 🚀 The Mock Stream Fallback
+            mock_review = f"**REVIEW**\n\nI received your repository containing **{len(req.files)} files**.\n\n### Architectural Summary\n* **Structure:** The codebase looks well-categorized based on the provided file tree.\n* **Next Steps:** Once the real API keys are injected, I will stream a deep-dive analysis of the system design right here.\n\n*Connection successfully closed.*"
+            
+            # Simulate the AI typing effect character-by-character
+            for char in mock_review:
+                yield char
+                time.sleep(0.01) # 10ms delay per character
+
+    # 3. Return the open stream instead of a static JSON dictionary
+    return StreamingResponse(stream_generator(), media_type="text/plain")
 
 
 # ------------------- Helper Functions -------------------
