@@ -1,18 +1,15 @@
 from __future__ import annotations
-import time
 from fastapi.responses import StreamingResponse
 import logging
-import os
+from typing import List
 from sqlite3 import IntegrityError
 from time import perf_counter
-from typing import List, Any, cast
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from openai import OpenAI
 
 
 from auth_utils import hash_password, verify_password
@@ -28,31 +25,10 @@ from database import (
 )
 from logging_config import configure_logging
 
-from schemas import LoginRequest, LogCreateRequest, RegisterRequest, UserUpdateRequest, GitHubIngestRequest
+from schemas import LoginRequest, LogCreateRequest, RegisterRequest, UserUpdateRequest, GitHubIngestRequest, CodebaseReviewRequest
 from connect import get_github_repo_tree, GITHUB_TOKEN
 
-
-# ------------------- AI Setup -------------------
-# Configured based on the DigitalOcean architecture
-AGENT_ENDPOINT = os.getenv("AGENT_ENDPOINT", "http://localhost:8000") + "/api/v1/"
-AGENT_ACCESS_KEY = os.getenv("AGENT_ACCESS_KEY", "dummy_key_")
-
-client = OpenAI(
-    base_url=AGENT_ENDPOINT,
-    api_key=AGENT_ACCESS_KEY,
-)
-
-# ------------------- Local Schemas -------------------
-# will move these to schemas.py later to keep things perfectly clean!
-class FileItem(BaseModel):
-    fileName: str
-    content: str
-    category: str
-    loc: int
-
-class CodebaseReviewRequest(BaseModel):
-    files: List[FileItem]
-
+from agent import CodeReviewAgent
 
 # ------------------- FastAPI Setup -------------------
 
@@ -163,55 +139,22 @@ def read_root():
 
 @app.post("/api/review")
 def generate_architecture_review(req: CodebaseReviewRequest):
-    """Analyzes the repository and streams the AI-generated review."""
-    logger.info(f"Starting AI stream for {len(req.files)} files", extra={"method": "POST", "path": "/api/review", "status_code": 200})
+    """Analyzes the repository architecture by routing it to the CodeReviewAgent."""
+    logger.info(f"Starting AI review for {len(req.files)} files", extra={"method": "POST", "path": "/api/review", "status_code": 200})
     
-    # 1. Build the repo structure string
+    # 1. Format the data for the agent
     repo_structure = ""
     for f in req.files:
         repo_structure += f"- {f.fileName} ({f.category}, {f.loc} LOC)\n"
 
-    messages = [
-        {
-            "role": "system",
-            "content": "You are an expert AI Software Architect. Review the provided repository structure and analyze its design, scalability, and potential security flaws."
-        },
-        {
-            "role": "user",
-            "content": f"Please review this codebase architecture:\n\n{repo_structure}\n\nProvide a high-level summary, identify any missing standard files (like .gitignore or README), and suggest architectural improvements."
-        }
-    ]
+    # 2. Instantiate our new reusable agent class
+    agent = CodeReviewAgent()
 
-    # 2. Define the Generator Function
-    def stream_generator():
-        try:
-            # Tell the OpenAI client to stream the response
-            response = client.chat.completions.create(
-                model="n/a",
-                messages=cast(Any, messages), # 🚀 Re-applied the fix here
-                extra_body={"include_retrieval_info": True},
-                stream=True 
-            )
-            
-            # Yield chunks as they arrive from the AI
-            for chunk in response:
-                if chunk.choices[0].delta.content is not None:
-                    yield chunk.choices[0].delta.content
-
-        except Exception as e:
-            logger.warning(f"AI Stream Failed: {str(e)}. Using Mock Stream.")
-            
-            # 🚀 The Mock Stream Fallback
-            mock_review = f"**REVIEW**\n\nI received your repository containing **{len(req.files)} files**.\n\n### Architectural Summary\n* **Structure:** The codebase looks well-categorized based on the provided file tree.\n* **Next Steps:** Once the real API keys are injected, I will stream a deep-dive analysis of the system design right here.\n\n*Connection successfully closed.*"
-            
-            # Simulate the AI typing effect character-by-character
-            for char in mock_review:
-                yield char
-                time.sleep(0.01) # 10ms delay per character
-
-    # 3. Return the open stream instead of a static JSON dictionary
-    return StreamingResponse(stream_generator(), media_type="text/plain")
-
+    # 3. Return the stream directly from the agent
+    return StreamingResponse(
+        agent.generate_review_stream(repo_structure, len(req.files)), 
+        media_type="text/plain"
+    )
 
 # ------------------- Helper Functions -------------------
 
