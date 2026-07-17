@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from typing import List, Optional
 
 class RegisterRequest(BaseModel):
     """
@@ -50,3 +51,12 @@ class LogCreateRequest(BaseModel):
 
 class GitHubIngestRequest(BaseModel):
     repoUrl: str = Field(..., min_length=5, max_length=200)
+
+class FileItem(BaseModel):
+    fileName: str
+    content: str
+    category: str
+    loc: int
+
+class CodebaseReviewRequest(BaseModel):
+    files: List[FileItem]
