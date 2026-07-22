@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 class RegisterRequest(BaseModel):
     """
@@ -60,3 +60,8 @@ class FileItem(BaseModel):
 
 class CodebaseReviewRequest(BaseModel):
     files: List[FileItem]
+
+class FileReviewRequest(BaseModel):
+    fileName: str
+    content: str
+    chatHistory: List[Dict[str, str]] = []  # Allows the AI to remember the conversation

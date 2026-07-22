@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-
+from fastapi import APIRouter
 
 from auth_utils import hash_password, verify_password
 from database import (
@@ -25,7 +25,7 @@ from database import (
 )
 from logging_config import configure_logging
 
-from schemas import LoginRequest, LogCreateRequest, RegisterRequest, UserUpdateRequest, GitHubIngestRequest, CodebaseReviewRequest
+from schemas import LoginRequest, LogCreateRequest, RegisterRequest, UserUpdateRequest, GitHubIngestRequest, CodebaseReviewRequest, FileReviewRequest
 from connect import get_github_repo_tree, GITHUB_TOKEN
 
 from agent import CodeReviewAgent
@@ -285,7 +285,27 @@ def ingest_github(payload: GitHubIngestRequest):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(ve))
     except RuntimeError as re:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(re))
-
+    
+@app.post("/api/review/file")
+async def review_single_file(request: FileReviewRequest):
+    try:
+        # 1. Extract the data sent by React
+        file_name = request.fileName
+        code_content = request.content
+        history = request.chatHistory
+        
+        # 2. Check if the user typed a custom message or just requested a review
+        if history and history[-1]["sender"] == "You":
+            user_text = history[-1]["text"]
+            mock_response = f"I see you said: '{user_text}'. I am currently a mock agent, but the real AI will process this request once the API keys are active!"
+        else:
+            mock_response = f"I have received `{file_name}`. It contains {len(code_content.splitlines())} lines of code. How can I help you improve it?"
+        
+        # 3. Send the response back to React
+        return {"sender": "Agent", "text": mock_response}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ------------------- Legacy Endpoints -------------------
 # These mimic JSON-server style endpoints for compatibility with older frontend code.
