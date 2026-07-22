@@ -14,7 +14,7 @@ class CodeReviewAgent:
     """
     
     def __init__(self):
-        # The coordinator's proxy configuration
+        # The proxy configuration
         self.endpoint = os.getenv("AGENT_ENDPOINT", "http://localhost:8000") + "/api/v1/"
         self.access_key = os.getenv("AGENT_ACCESS_KEY", "dummy_key_waiting_for_coordinator")
         
@@ -40,7 +40,7 @@ class CodeReviewAgent:
         ]
 
         try:
-            # 🚀 Attempt the Real AI Call
+            #  Attempt the Real AI Call
             response = self.client.chat.completions.create(
                 model="n/a",
                 messages=cast(Any, messages),
