@@ -13,22 +13,22 @@ This repository serves as the secure data layer and API gateway, handling user a
 - [Installation & Setup](#installation--setup)
 - [Interactive API Docs](#interactive-api-docs)
 - [Project Structure](#project-structure)
-
+- [License](#license)
 ---
 
 ## 📖 About
-Designed with a decoupled microservice architecture, this backend provides a robust RESTful API that communicates seamlessly with the React frontend. It utilizes an embedded SQLite database and enforces strict data validation to ensure a secure, zero-friction user experience.
+Designed with a decoupled microservice architecture, this backend provides a robust RESTful API that communicates seamlessly with the React frontend. It utilizes an embedded SQLite database, enforces strict Pydantic data validation, and features a custom GitHub ingestion engine to securely fetch and analyze repository architectures.
 
 ---
 
 ## ✨ Core Features
 - ⚡ **FastAPI Framework:** High-performance, asynchronous REST API.
+- 🧠 **AI Agent Integration:** Dedicated agent routing for contextual code reviews and interactive line-by-line chat, complete with a built-in fallback mock agent for local development.
+- 🐙 **GitHub Ingestion Engine:** Connects directly to GitHub to securely fetch raw repository architecture and code, utilizing memory-safe file size limits and bypassing massive `.zip` payloads.
 - 🔐 **Secure Authentication:** Implements SHA-256 cryptographic salting and hashing for secure user credential storage.
-- 🗄️ **Embedded SQLite Database:** Zero-config database handling user profiles and system state.
-- 🛡️ **Pydantic Validation:** Strict request/response payload validation to prevent bad data from hitting the database.
-- 📜 **Custom Logging Engine:** A custom SQLite log handler that intercepts global HTTP exceptions and records chronological system events.
-- 🚦 **Global Exception Handlers:** Graceful error interception returning clean, formatted JSON (401, 404, 409, 422).
-
+- 🗄️ **Embedded SQLite Database:** Zero-config database handling user profiles, system state, and chronological API logs.
+- 🛡️ **Pydantic Validation:** Strict request/response payload validation to prevent malformed data from hitting the database.
+- 🚦 **Global Exception Handlers:** Graceful error interception returning clean, formatted JSON for all HTTP states (401, 404, 409, 422, 500).
 ---
 
 ## 💻 Requirements
@@ -57,6 +57,13 @@ Designed with a decoupled microservice architecture, this backend provides a rob
    pip install -r requirements.txt
    ```
 
+
+4. **Configure Environment Variables**
+   ```bash
+   GITHUB_TOKEN=your_github_personal_access_token
+   # Add your AI Provider API keys here when active
+   ```
+
 4. **Run the backend**
    ```bash
    uvicorn main:app --reload
@@ -82,7 +89,3 @@ ai-code-reviewer-agent-backend/
 
 ## LICENSE
 This Project is under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-### In development:
-- [Configuration](#configuration)
-- [Contributing](#contributing)
